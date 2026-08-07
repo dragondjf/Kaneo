@@ -1,49 +1,46 @@
 import { createId } from "@paralleldrive/cuid2";
 import { relations, sql } from "drizzle-orm";
 import {
-  boolean,
   foreignKey,
   index,
   integer,
-  jsonb,
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
   unique,
   uniqueIndex,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 
-export const userTable = pgTable("user", {
+export const userTable = sqliteTable("user", {
   id: text("id")
     .$defaultFn(() => createId())
     .primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified")
+  emailVerified: integer("email_verified", { mode: "boolean" })
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
   locale: text("locale"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  isAnonymous: boolean("is_anonymous").default(false),
+  isAnonymous: integer("is_anonymous", { mode: "boolean" }).default(false),
   role: text("role"),
-  banned: boolean("banned").default(false),
+  banned: integer("banned", { mode: "boolean" }).default(false),
   banReason: text("ban_reason"),
-  banExpires: timestamp("ban_expires", { mode: "date" }),
+  banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
 });
 
-export const sessionTable = pgTable(
+export const sessionTable = sqliteTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
     ipAddress: text("ip_address"),
@@ -58,7 +55,7 @@ export const sessionTable = pgTable(
   (table) => [index("session_userId_idx").on(table.userId)],
 );
 
-export const accountTable = pgTable(
+export const accountTable = sqliteTable(
   "account",
   {
     id: text("id")
@@ -72,23 +69,23 @@ export const accountTable = pgTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", {
-      mode: "date",
+    accessTokenExpiresAt: integer("access_token_expires_at", {
+      mode: "timestamp_ms",
     }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
-      mode: "date",
+    refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+      mode: "timestamp_ms",
     }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
   (table) => [index("account_userId_idx").on(table.userId)],
 );
 
-export const verificationTable = pgTable(
+export const verificationTable = sqliteTable(
   "verification",
   {
     id: text("id")
@@ -96,9 +93,9 @@ export const verificationTable = pgTable(
       .primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
@@ -106,7 +103,7 @@ export const verificationTable = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const workspaceTable = pgTable("workspace", {
+export const workspaceTable = sqliteTable("workspace", {
   id: text("id")
     .$defaultFn(() => createId())
     .primaryKey(),
@@ -115,10 +112,10 @@ export const workspaceTable = pgTable("workspace", {
   logo: text("logo"),
   metadata: text("metadata"),
   description: text("description"),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-export const workspaceUserTable = pgTable(
+export const workspaceUserTable = sqliteTable(
   "workspace_member",
   {
     id: text("id")
@@ -135,7 +132,7 @@ export const workspaceUserTable = pgTable(
         onDelete: "cascade",
       }),
     role: text("role").default("member").notNull(),
-    joinedAt: timestamp("joined_at", { mode: "date" }).notNull(),
+    joinedAt: integer("joined_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("workspace_member_workspaceId_idx").on(table.workspaceId),
@@ -143,7 +140,7 @@ export const workspaceUserTable = pgTable(
   ],
 );
 
-export const workspaceBillingTable = pgTable(
+export const workspaceBillingTable = sqliteTable(
   "workspace_billing",
   {
     id: text("id")
@@ -156,8 +153,8 @@ export const workspaceBillingTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
-    foundingFree: boolean("founding_free").notNull().default(false),
-    trialEndsAt: timestamp("trial_ends_at", { mode: "date" }),
+    foundingFree: integer("founding_free", { mode: "boolean" }).notNull().default(false),
+    trialEndsAt: integer("trial_ends_at", { mode: "timestamp_ms" }),
     creemCustomerId: text("creem_customer_id"),
     creemSubscriptionId: text("creem_subscription_id").unique(),
     creemProductId: text("creem_product_id"),
@@ -165,10 +162,10 @@ export const workspaceBillingTable = pgTable(
     billingInterval: text("billing_interval"),
     status: text("status"),
     seats: integer("seats").notNull().default(1),
-    currentPeriodEnd: timestamp("current_period_end", { mode: "date" }),
-    canceledAt: timestamp("canceled_at", { mode: "date" }),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
+    canceledAt: integer("canceled_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -176,15 +173,15 @@ export const workspaceBillingTable = pgTable(
   (table) => [index("workspace_billing_workspaceId_idx").on(table.workspaceId)],
 );
 
-export const billingEventTable = pgTable("billing_event", {
+export const billingEventTable = sqliteTable("billing_event", {
   id: text("id").primaryKey(),
   eventType: text("event_type").notNull(),
-  processedAt: timestamp("processed_at", { mode: "date" })
+  processedAt: integer("processed_at", { mode: "timestamp_ms" })
     .defaultNow()
     .notNull(),
 });
 
-export const teamTable = pgTable(
+export const teamTable = sqliteTable(
   "team",
   {
     id: text("id").primaryKey(),
@@ -192,15 +189,15 @@ export const teamTable = pgTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaceTable.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").$onUpdate(
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$onUpdate(
       () => /* @__PURE__ */ new Date(),
     ),
   },
   (table) => [index("team_workspaceId_idx").on(table.workspaceId)],
 );
 
-export const teamMemberTable = pgTable(
+export const teamMemberTable = sqliteTable(
   "team_member",
   {
     id: text("id").primaryKey(),
@@ -210,7 +207,7 @@ export const teamMemberTable = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }),
   },
   (table) => [
     index("teamMember_teamId_idx").on(table.teamId),
@@ -218,7 +215,7 @@ export const teamMemberTable = pgTable(
   ],
 );
 
-export const invitationTable = pgTable(
+export const invitationTable = sqliteTable(
   "invitation",
   {
     id: text("id")
@@ -231,8 +228,8 @@ export const invitationTable = pgTable(
     role: text("role"),
     teamId: text("team_id"),
     status: text("status").default("pending").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
     inviterId: text("inviter_id")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
@@ -244,7 +241,7 @@ export const invitationTable = pgTable(
   ],
 );
 
-export const workspaceRoleTable = pgTable(
+export const workspaceRoleTable = sqliteTable(
   "workspace_role",
   {
     id: text("id")
@@ -258,8 +255,8 @@ export const workspaceRoleTable = pgTable(
       }),
     role: text("role").notNull(),
     permission: text("permission").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -270,7 +267,7 @@ export const workspaceRoleTable = pgTable(
   ],
 );
 
-export const projectTable = pgTable(
+export const projectTable = sqliteTable(
   "project",
   {
     id: text("id")
@@ -286,9 +283,9 @@ export const projectTable = pgTable(
     icon: text("icon").default("Layout"),
     name: text("name").notNull(),
     description: text("description"),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    isPublic: boolean("is_public").default(false),
-    archivedAt: timestamp("archived_at", { mode: "date" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    isPublic: integer("is_public", { mode: "boolean" }).default(false),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
     lastTaskNumber: integer("last_task_number").notNull().default(0),
   },
   (table) => [
@@ -296,7 +293,7 @@ export const projectTable = pgTable(
   ],
 );
 
-export const columnTable = pgTable(
+export const columnTable = sqliteTable(
   "column",
   {
     id: text("id")
@@ -313,9 +310,9 @@ export const columnTable = pgTable(
     position: integer("position").notNull().default(0),
     icon: text("icon"),
     color: text("color"),
-    isFinal: boolean("is_final").default(false).notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    isFinal: integer("is_final", { mode: "boolean" }).default(false).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -323,7 +320,7 @@ export const columnTable = pgTable(
   (table) => [index("column_projectId_idx").on(table.projectId)],
 );
 
-export const workflowRuleTable = pgTable(
+export const workflowRuleTable = sqliteTable(
   "workflow_rule",
   {
     id: text("id")
@@ -343,8 +340,8 @@ export const workflowRuleTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -355,7 +352,7 @@ export const workflowRuleTable = pgTable(
   ],
 );
 
-export const taskTable = pgTable(
+export const taskTable = sqliteTable(
   "task",
   {
     id: text("id")
@@ -381,10 +378,10 @@ export const taskTable = pgTable(
       onUpdate: "cascade",
     }),
     priority: text("priority").default("low"),
-    startDate: timestamp("start_date", { mode: "date" }),
-    dueDate: timestamp("due_date", { mode: "date" }),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    startDate: integer("start_date", { mode: "timestamp_ms" }),
+    dueDate: integer("due_date", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -398,7 +395,7 @@ export const taskTable = pgTable(
   ],
 );
 
-export const taskReminderSentTable = pgTable(
+export const taskReminderSentTable = sqliteTable(
   "task_reminder_sent",
   {
     id: text("id")
@@ -411,8 +408,8 @@ export const taskReminderSentTable = pgTable(
         onUpdate: "cascade",
       }),
     reminderType: text("reminder_type").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -426,7 +423,7 @@ export const taskReminderSentTable = pgTable(
   ],
 );
 
-export const timeEntryTable = pgTable(
+export const timeEntryTable = sqliteTable(
   "time_entry",
   {
     id: text("id")
@@ -443,11 +440,11 @@ export const timeEntryTable = pgTable(
       onUpdate: "cascade",
     }),
     description: text("description"),
-    startTime: timestamp("start_time", { mode: "date" }).notNull(),
-    endTime: timestamp("end_time", { mode: "date" }),
+    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    endTime: integer("end_time", { mode: "timestamp_ms" }),
     duration: integer("duration").default(0),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -458,7 +455,7 @@ export const timeEntryTable = pgTable(
   ],
 );
 
-export const activityTable = pgTable(
+export const activityTable = sqliteTable(
   "activity",
   {
     id: text("id")
@@ -471,8 +468,8 @@ export const activityTable = pgTable(
         onUpdate: "cascade",
       }),
     type: text("type").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -481,7 +478,7 @@ export const activityTable = pgTable(
       onUpdate: "cascade",
     }),
     content: text("content"),
-    eventData: jsonb("event_data"),
+    eventData: text("event_data", { mode: "json" }),
     externalUserName: text("external_user_name"),
     externalUserAvatar: text("external_user_avatar"),
     externalSource: text("external_source"),
@@ -498,7 +495,7 @@ export const activityTable = pgTable(
   ],
 );
 
-export const assetTable = pgTable(
+export const assetTable = sqliteTable(
   "asset",
   {
     id: text("id")
@@ -534,7 +531,7 @@ export const assetTable = pgTable(
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
   },
   (table) => [
     index("asset_workspaceId_idx").on(table.workspaceId),
@@ -545,7 +542,7 @@ export const assetTable = pgTable(
   ],
 );
 
-export const labelTable = pgTable(
+export const labelTable = sqliteTable(
   "label",
   {
     id: text("id")
@@ -553,8 +550,8 @@ export const labelTable = pgTable(
       .primaryKey(),
     name: text("name").notNull(),
     color: text("color").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -577,7 +574,7 @@ export const labelTable = pgTable(
   ],
 );
 
-export const notificationTable = pgTable(
+export const notificationTable = sqliteTable(
   "notification",
   {
     id: text("id")
@@ -592,14 +589,14 @@ export const notificationTable = pgTable(
     title: text("title"),
     content: text("content"),
     type: text("type").notNull().default("info"),
-    eventData: jsonb("event_data"),
-    isRead: boolean("is_read").default(false),
+    eventData: text("event_data", { mode: "json" }),
+    isRead: integer("is_read", { mode: "boolean" }).default(false),
     resourceId: text("resource_id"),
     resourceType: text("resource_type"),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .defaultNow()
       .notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -607,7 +604,7 @@ export const notificationTable = pgTable(
   (table) => [index("notification_userId_idx").on(table.userId)],
 );
 
-export const userNotificationPreferenceTable = pgTable(
+export const userNotificationPreferenceTable = sqliteTable(
   "user_notification_preference",
   {
     id: text("id")
@@ -620,25 +617,25 @@ export const userNotificationPreferenceTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
-    emailEnabled: boolean("email_enabled").default(false).notNull(),
-    ntfyEnabled: boolean("ntfy_enabled").default(false).notNull(),
+    emailEnabled: integer("email_enabled", { mode: "boolean" }).default(false).notNull(),
+    ntfyEnabled: integer("ntfy_enabled", { mode: "boolean" }).default(false).notNull(),
     ntfyServerUrl: text("ntfy_server_url"),
     ntfyTopic: text("ntfy_topic"),
     ntfyToken: text("ntfy_token"),
-    gotifyEnabled: boolean("gotify_enabled").default(false).notNull(),
+    gotifyEnabled: integer("gotify_enabled", { mode: "boolean" }).default(false).notNull(),
     gotifyServerUrl: text("gotify_server_url"),
     gotifyToken: text("gotify_token"),
-    webhookEnabled: boolean("webhook_enabled").default(false).notNull(),
+    webhookEnabled: integer("webhook_enabled", { mode: "boolean" }).default(false).notNull(),
     webhookUrl: text("webhook_url"),
     webhookSecret: text("webhook_secret"),
-    taskAssignmentEnabled: boolean("task_assignment_enabled")
+    taskAssignmentEnabled: integer("task_assignment_enabled", { mode: "boolean" })
       .default(true)
       .notNull(),
-    taskCommentEnabled: boolean("task_comment_enabled").default(true).notNull(),
-    taskStatusChangeEnabled: boolean("task_status_change_enabled")
+    taskCommentEnabled: integer("task_comment_enabled", { mode: "boolean" }).default(true).notNull(),
+    taskStatusChangeEnabled: integer("task_status_change_enabled", { mode: "boolean" })
       .default(true)
       .notNull(),
-    dueDateReminderEnabled: boolean("due_date_reminder_enabled")
+    dueDateReminderEnabled: integer("due_date_reminder_enabled", { mode: "boolean" })
       .default(true)
       .notNull(),
     dueDateReminderLeadTimeMinutes: integer(
@@ -646,15 +643,15 @@ export const userNotificationPreferenceTable = pgTable(
     )
       .default(1440)
       .notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
 );
 
-export const userNotificationWorkspaceRuleTable = pgTable(
+export const userNotificationWorkspaceRuleTable = sqliteTable(
   "user_notification_workspace_rule",
   {
     id: text("id")
@@ -672,14 +669,14 @@ export const userNotificationWorkspaceRuleTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
-    isActive: boolean("is_active").default(true).notNull(),
-    emailEnabled: boolean("email_enabled").default(false).notNull(),
-    ntfyEnabled: boolean("ntfy_enabled").default(false).notNull(),
-    gotifyEnabled: boolean("gotify_enabled").default(false).notNull(),
-    webhookEnabled: boolean("webhook_enabled").default(false).notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+    emailEnabled: integer("email_enabled", { mode: "boolean" }).default(false).notNull(),
+    ntfyEnabled: integer("ntfy_enabled", { mode: "boolean" }).default(false).notNull(),
+    gotifyEnabled: integer("gotify_enabled", { mode: "boolean" }).default(false).notNull(),
+    webhookEnabled: integer("webhook_enabled", { mode: "boolean" }).default(false).notNull(),
     projectMode: text("project_mode").default("all").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -700,7 +697,7 @@ export const userNotificationWorkspaceRuleTable = pgTable(
   ],
 );
 
-export const userNotificationWorkspaceProjectTable = pgTable(
+export const userNotificationWorkspaceProjectTable = sqliteTable(
   "user_notification_workspace_project",
   {
     id: text("id")
@@ -714,8 +711,8 @@ export const userNotificationWorkspaceProjectTable = pgTable(
       }),
     workspaceRuleId: text("workspace_rule_id").notNull(),
     projectId: text("project_id").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -757,7 +754,7 @@ export const userNotificationWorkspaceProjectTable = pgTable(
   ],
 );
 
-export const githubIntegrationTable = pgTable("github_integration", {
+export const githubIntegrationTable = sqliteTable("github_integration", {
   id: text("id")
     .$defaultFn(() => createId())
     .primaryKey(),
@@ -771,15 +768,15 @@ export const githubIntegrationTable = pgTable("github_integration", {
   repositoryOwner: text("repository_owner").notNull(),
   repositoryName: text("repository_name").notNull(),
   installationId: integer("installation_id"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
 });
 
-export const integrationTable = pgTable(
+export const integrationTable = sqliteTable(
   "integration",
   {
     id: text("id")
@@ -793,9 +790,9 @@ export const integrationTable = pgTable(
       }),
     type: text("type").notNull(),
     config: text("config").notNull(),
-    isActive: boolean("is_active").default(true),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -807,7 +804,7 @@ export const integrationTable = pgTable(
   ],
 );
 
-export const externalLinkTable = pgTable(
+export const externalLinkTable = sqliteTable(
   "external_link",
   {
     id: text("id")
@@ -830,8 +827,8 @@ export const externalLinkTable = pgTable(
     url: text("url").notNull(),
     title: text("title"),
     metadata: text("metadata"),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -844,7 +841,7 @@ export const externalLinkTable = pgTable(
   ],
 );
 
-export const commentTable = pgTable(
+export const commentTable = sqliteTable(
   "comment",
   {
     id: text("id")
@@ -863,8 +860,8 @@ export const commentTable = pgTable(
         onUpdate: "cascade",
       }),
     content: text("content").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -875,7 +872,7 @@ export const commentTable = pgTable(
   ],
 );
 
-export const taskRelationTable = pgTable(
+export const taskRelationTable = sqliteTable(
   "task_relation",
   {
     id: text("id")
@@ -894,7 +891,7 @@ export const taskRelationTable = pgTable(
         onUpdate: "cascade",
       }),
     relationType: text("relation_type").notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
   },
   (table) => [
     index("task_relation_source_idx").on(table.sourceTaskId),
@@ -902,7 +899,7 @@ export const taskRelationTable = pgTable(
   ],
 );
 
-export const apikeyTable = pgTable(
+export const apikeyTable = sqliteTable(
   "apikey",
   {
     id: text("id")
@@ -921,17 +918,17 @@ export const apikeyTable = pgTable(
     }),
     refillInterval: integer("refill_interval"),
     refillAmount: integer("refill_amount"),
-    lastRefillAt: timestamp("last_refill_at", { mode: "date" }),
-    enabled: boolean("enabled").default(true),
-    rateLimitEnabled: boolean("rate_limit_enabled").default(true),
+    lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }).default(true),
     rateLimitTimeWindow: integer("rate_limit_time_window").default(86400000),
     rateLimitMax: integer("rate_limit_max").default(10),
     requestCount: integer("request_count").default(0),
     remaining: integer("remaining"),
-    lastRequest: timestamp("last_request", { mode: "date" }),
-    expiresAt: timestamp("expires_at", { mode: "date" }),
-    createdAt: timestamp("created_at", { mode: "date" }).notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" }).notNull(),
+    lastRequest: integer("last_request", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
     permissions: text("permissions"),
     metadata: text("metadata"),
   },
@@ -943,7 +940,7 @@ export const apikeyTable = pgTable(
   ],
 );
 
-export const deviceCodeTable = pgTable(
+export const deviceCodeTable = sqliteTable(
   "device_code",
   {
     id: text("id")
@@ -955,14 +952,14 @@ export const deviceCodeTable = pgTable(
       onDelete: "cascade",
       onUpdate: "cascade",
     }),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
-    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
     status: text("status").notNull(),
-    lastPolledAt: timestamp("last_polled_at", { mode: "date" }),
+    lastPolledAt: integer("last_polled_at", { mode: "timestamp_ms" }),
     pollingInterval: integer("polling_interval"),
     clientId: text("client_id"),
     scope: text("scope"),
@@ -974,7 +971,7 @@ export const deviceCodeTable = pgTable(
   ],
 );
 
-export const mcpOauthStateTable = pgTable(
+export const mcpOauthStateTable = sqliteTable(
   "mcp_oauth_state",
   {
     id: text("id")
@@ -982,10 +979,10 @@ export const mcpOauthStateTable = pgTable(
       .primaryKey(),
     kind: text("kind").notNull(),
     key: text("key").notNull(),
-    payload: jsonb("payload").notNull(),
-    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" })
+    payload: text("payload", { mode: "json" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),

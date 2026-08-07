@@ -59,13 +59,13 @@ async function resolveDestinationStatus(
   return requestedColumn ?? matchingCurrentColumn ?? firstColumn;
 }
 
-async function getNextTaskPosition(
+function getNextTaskPosition(
   dbOrTx: DbOrTx,
   projectId: string,
   status: string,
   columnId: string,
 ) {
-  const [maxPositionResult] = await dbOrTx
+  const [maxPositionResult] = dbOrTx
     .select({ maxPosition: max(taskTable.position) })
     .from(taskTable)
     .where(
@@ -74,7 +74,8 @@ async function getNextTaskPosition(
         eq(taskTable.status, status),
         eq(taskTable.columnId, columnId),
       ),
-    );
+    )
+    .all();
 
   return (maxPositionResult?.maxPosition ?? 0) + 1;
 }
@@ -133,18 +134,16 @@ async function moveTask({
     destinationStatus,
   );
 
-  const movedTask = await db.transaction(async (tx) => {
-    const [nextTaskNumber, nextPosition] = await Promise.all([
-      claimTaskNumber(destinationProjectId, tx),
-      getNextTaskPosition(
-        tx,
-        destinationProjectId,
-        resolvedColumn.slug,
-        resolvedColumn.id,
-      ),
-    ]);
+  const movedTask = db.transaction((tx) => {
+    const nextTaskNumber = claimTaskNumber(destinationProjectId, tx);
+    const nextPosition = getNextTaskPosition(
+      tx,
+      destinationProjectId,
+      resolvedColumn.slug,
+      resolvedColumn.id,
+    );
 
-    const [updatedTask] = await tx
+    const [updatedTask] = tx
       .update(taskTable)
       .set({
         projectId: destinationProjectId,
@@ -154,7 +153,8 @@ async function moveTask({
         position: nextPosition,
       })
       .where(eq(taskTable.id, taskId))
-      .returning();
+      .returning()
+      .all();
 
     if (!updatedTask) {
       throw new HTTPException(500, {
@@ -162,10 +162,11 @@ async function moveTask({
       });
     }
 
-    await tx
+    tx
       .update(assetTable)
       .set({ projectId: destinationProjectId })
-      .where(eq(assetTable.taskId, taskId));
+      .where(eq(assetTable.taskId, taskId))
+      .run();
 
     return updatedTask;
   });

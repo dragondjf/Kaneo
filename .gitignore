@@ -39,6 +39,12 @@ yarn-error.log*
 
 # DB
 *.db
+apps/api/data/
+
+# Local dev logs & artifacts
+api-dev.log
+web-dev.log
+apps/api/drizzle-pg-backup/
 
 # Cache
 .cache/

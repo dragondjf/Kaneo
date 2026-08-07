@@ -4,10 +4,10 @@ import db from "../../database";
 import { labelTable } from "../../database/schema";
 
 async function updateLabel(id: string, name: string, color: string) {
-  return db.transaction(async (tx) => {
-    const label = await tx.query.labelTable.findFirst({
+  return db.transaction((tx) => {
+    const label = tx.query.labelTable.findFirst({
       where: (label, { eq }) => eq(label.id, id),
-    });
+    }).sync();
 
     if (!label) {
       throw new HTTPException(404, {
@@ -15,16 +15,17 @@ async function updateLabel(id: string, name: string, color: string) {
       });
     }
 
-    const [updatedLabel] = await tx
+    const [updatedLabel] = tx
       .update(labelTable)
       .set({ name, color })
       .where(eq(labelTable.id, id))
-      .returning();
+      .returning()
+      .all();
 
     // If this is a workspace-level label, cascade the changes to all
     // task-level copies so existing label assignments reflect the new color/name
     if (!label.taskId && label.workspaceId) {
-      await tx
+      tx
         .update(labelTable)
         .set({ name, color })
         .where(
@@ -33,7 +34,8 @@ async function updateLabel(id: string, name: string, color: string) {
             eq(labelTable.name, label.name),
             isNotNull(labelTable.taskId),
           ),
-        );
+        )
+        .run();
     }
 
     return updatedLabel;

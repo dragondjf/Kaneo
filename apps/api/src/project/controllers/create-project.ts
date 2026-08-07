@@ -14,8 +14,8 @@ async function createProject(
   icon: string,
   slug: string,
 ) {
-  return db.transaction(async (tx) => {
-    const [createdProject] = await tx
+  return db.transaction((tx) => {
+    const [createdProject] = tx
       .insert(projectTable)
       .values({
         workspaceId,
@@ -23,17 +23,18 @@ async function createProject(
         icon,
         slug,
       })
-      .returning();
+      .returning()
+      .all();
 
     if (createdProject) {
       for (const col of DEFAULT_PROJECT_COLUMNS) {
-        await tx.insert(columnTable).values({
+        tx.insert(columnTable).values({
           projectId: createdProject.id,
           name: col.name,
           slug: col.slug,
           position: col.position,
           isFinal: col.isFinal,
-        });
+        }).run();
       }
     }
 

@@ -7,7 +7,7 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import * as Sentry from "@sentry/node";
 import type { Session, User } from "better-auth/types";
 import { eq, sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -764,7 +764,7 @@ export async function runStartupTasks() {
     waitForDatabase: async () => {
       await waitForDatabase({
         query: async () => {
-          await getDatabase().execute(sql`SELECT 1`);
+          await getDatabase().all(sql`SELECT 1`);
         },
       });
     },

@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import db from "../../database";
+import { tableExists } from "../../database/sqlite-helpers";
 import {
   externalLinkTable,
   integrationTable,
@@ -7,23 +8,12 @@ import {
 } from "../../database/schema";
 import { defaultGitHubConfig } from "./config";
 
-async function tableExists(tableName: string): Promise<boolean> {
-  try {
-    const result = await db.execute(sql`
-			SELECT EXISTS (
-				SELECT FROM information_schema.tables 
-				WHERE table_schema = 'public'
-				AND table_name = ${tableName}
-			);
-		`);
-    return (result.rows[0] as { exists: boolean })?.exists === true;
-  } catch {
-    return false;
-  }
+async function tableExistsSql(tableName: string): Promise<boolean> {
+  return tableExists(db, tableName);
 }
 
 export async function migrateGitHubIntegration() {
-  const oldTableExists = await tableExists("github_integration");
+  const oldTableExists = await tableExistsSql("github_integration");
 
   if (!oldTableExists) {
     console.log("No old github_integration table found, skipping migration");
@@ -168,6 +158,6 @@ async function migrateTaskLinks() {
 
 async function dropOldTable() {
   console.log("🗑️ Dropping old github_integration table...");
-  await db.execute(sql`DROP TABLE IF EXISTS github_integration CASCADE`);
+  await db.run(sql`DROP TABLE IF EXISTS github_integration`);
   console.log("✓ Dropped github_integration table");
 }

@@ -33,7 +33,7 @@ import {
 import type { AccessControl } from "better-auth/plugins/access";
 import type { UserWithAnonymous } from "better-auth/plugins/anonymous";
 import { config } from "dotenv-mono";
-import { count, eq, sql } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
 import db, { schema } from "./database";
 import { publishEvent } from "./events";
@@ -173,7 +173,7 @@ export const auth = betterAuth({
   secret: process.env.AUTH_SECRET || "",
   basePath: "/api/auth",
   database: drizzleAdapter(db, {
-    provider: "pg",
+    provider: "sqlite",
     schema: {
       ...schema,
       user: schema.userTable,
@@ -566,21 +566,23 @@ export const auth = betterAuth({
           // transactions, so two concurrent first-signups could both
           // see count=0 and both become admins (qodo bot #5).
           //
-          // We now run the check + promote inside a single transaction
-          // guarded by a Postgres advisory lock. Whichever transaction
-          // wins the lock first promotes its user; any concurrent
-          // transaction then sees totalUserCount > 1 and skips.
+          // We now run the check + promote inside a single transaction.
+          // On PostgreSQL this was guarded by an advisory lock; with
+          // SQLite (better-sqlite3) writes are serialized by the
+          // single-connection transaction, so the check + update stays
+          // atomic. Whichever transaction commits first promotes its
+          // user; any concurrent transaction then sees totalUserCount
+          // > 1 and skips.
           //
           // Note: we count total users (not admins) so that upgrading
           // an existing instance (where every existing user has
           // role=NULL from the new column) doesn't promote the next
           // signup to admin (qodo bot #4).
-          await db.transaction(async (tx) => {
-            await tx.execute(sql`SELECT pg_advisory_xact_lock(2026)`);
-
-            const totalRows = await tx
+          db.transaction((tx) => {
+            const totalRows = tx
               .select({ value: count() })
-              .from(schema.userTable);
+              .from(schema.userTable)
+              .all();
             const totalUserCount = totalRows[0]?.value ?? 0;
 
             // This hook runs after the user row is inserted, so the
@@ -588,10 +590,11 @@ export const auth = betterAuth({
             // the only row in the table, this is a fresh-instance
             // bootstrap and they get promoted to admin.
             if (totalUserCount === 1) {
-              await tx
+              tx
                 .update(schema.userTable)
                 .set({ role: "admin" })
-                .where(eq(schema.userTable.id, user.id));
+                .where(eq(schema.userTable.id, user.id))
+                .run();
             }
           });
         },

@@ -1,11 +1,17 @@
 import { sql } from "drizzle-orm";
 import db from "../database";
+import { columnExists, tableExists } from "../database/sqlite-helpers";
 
 /**
  * Migration script to:
  * 1. Rename active_workspace_id to active_organization_id in session table
  * 2. Add created_at column to invitation table if it doesn't exist
  * This runs before Drizzle migrations to ensure the column names match the schema.
+ *
+ * SQLite notes: fresh installs are created directly from the Drizzle schema
+ * (correct columns, defaults and NOT NULL constraints), so these legacy
+ * upgrade steps are no-ops. The SQL below is SQLite-compatible for the cases
+ * that can still be reached.
  */
 export async function migrateSessionColumn() {
   console.log(
@@ -14,50 +20,36 @@ export async function migrateSessionColumn() {
 
   try {
     // Migrate session table column
-    const sessionTableExists = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_name = 'session'
-      ) AS exists;
-    `);
+    const sessionExists = await tableExists(db, "session");
 
-    const sessionExists =
-      sessionTableExists.rows[0]?.exists === true ||
-      sessionTableExists.rows[0]?.exists === "t";
     if (sessionExists) {
-      // Check if active_workspace_id column exists
-      const hasOldColumn = await db.execute(sql`
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'session'
-        AND column_name = 'active_workspace_id'
-      `);
+      const hasOldColumn = await columnExists(
+        db,
+        "session",
+        "active_workspace_id",
+      );
+      const hasNewColumn = await columnExists(
+        db,
+        "session",
+        "active_organization_id",
+      );
 
-      // Check if active_organization_id column already exists
-      const hasNewColumn = await db.execute(sql`
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'session'
-        AND column_name = 'active_organization_id'
-      `);
-
-      if (hasOldColumn.rows.length > 0 && hasNewColumn.rows.length === 0) {
+      if (hasOldColumn && !hasNewColumn) {
         console.log(
           "📝 Found active_workspace_id column, renaming to active_organization_id...",
         );
-        await db.execute(sql`
-          ALTER TABLE "session" 
+        await db.run(sql`
+          ALTER TABLE "session"
           RENAME COLUMN "active_workspace_id" TO "active_organization_id";
         `);
         console.log(
           "✅ Successfully renamed active_workspace_id to active_organization_id",
         );
-      } else if (hasNewColumn.rows.length > 0) {
+      } else if (hasNewColumn) {
         console.log(
           "✅ active_organization_id column already exists; skipping migration.",
         );
-      } else if (hasOldColumn.rows.length === 0) {
+      } else {
         console.log(
           "🛈 active_workspace_id column does not exist; skipping migration.",
         );
@@ -71,47 +63,28 @@ export async function migrateSessionColumn() {
       "🔄 Checking invitation table for created_at column migration...",
     );
 
-    const invitationTableExists = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_name = 'invitation'
-      ) AS exists;
-    `);
-
-    const invitationExists =
-      invitationTableExists.rows[0]?.exists === true ||
-      invitationTableExists.rows[0]?.exists === "t";
+    const invitationExists = await tableExists(db, "invitation");
 
     if (invitationExists) {
-      const hasCreatedAt = await db.execute(sql`
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'invitation'
-        AND column_name = 'created_at'
-      `);
+      const hasCreatedAt = await columnExists(db, "invitation", "created_at");
 
-      if (hasCreatedAt.rows.length === 0) {
+      if (!hasCreatedAt) {
         console.log("📝 Adding created_at column to invitation table...");
         // Add column as nullable first
-        await db.execute(sql`
-          ALTER TABLE "invitation" 
+        await db.run(sql`
+          ALTER TABLE "invitation"
           ADD COLUMN "created_at" timestamp;
         `);
 
         // Set default value for existing rows (use expires_at - 1 month as a reasonable default)
-        await db.execute(sql`
-          UPDATE "invitation" 
-          SET "created_at" = COALESCE("expires_at" - INTERVAL '1 month', NOW())
+        await db.run(sql`
+          UPDATE "invitation"
+          SET "created_at" = datetime(COALESCE("expires_at", datetime('now')), '-1 month')
           WHERE "created_at" IS NULL;
         `);
 
-        // Now make it NOT NULL with default
-        await db.execute(sql`
-          ALTER TABLE "invitation" 
-          ALTER COLUMN "created_at" SET DEFAULT NOW(),
-          ALTER COLUMN "created_at" SET NOT NULL;
-        `);
+        // SQLite cannot ALTER COLUMN SET DEFAULT/NOT NULL; fresh installs get
+        // the correct definition from the Drizzle migrations instead.
         console.log(
           "✅ Successfully added created_at column to invitation table",
         );

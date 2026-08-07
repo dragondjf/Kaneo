@@ -234,21 +234,24 @@ async function importSingleIssue(
     return "updated";
   }
 
-  const createdTask = await db.transaction(async (tx) => {
-    const [lockedProject] = await tx
+  const createdTask = db.transaction((tx) => {
+    // SQLite (better-sqlite3) serializes writes within a transaction, so no
+    // row-level lock (`SELECT ... FOR UPDATE`) is needed or supported.
+    const [lockedProject] = tx
       .select()
       .from(projectTable)
       .where(eq(projectTable.id, projectId))
-      .for("update");
+      .all();
 
     if (!lockedProject) {
       throw new Error("Project not found");
     }
 
-    const [result] = await tx
+    const [result] = tx
       .select({ maxNumber: max(taskTable.number) })
       .from(taskTable)
-      .where(eq(taskTable.projectId, projectId));
+      .where(eq(taskTable.projectId, projectId))
+      .all();
 
     const nextNumber = (result?.maxNumber ?? 0) + 1;
 
@@ -262,7 +265,7 @@ async function importSingleIssue(
       number: nextNumber,
     };
 
-    const [created] = await tx.insert(taskTable).values(taskValues).returning();
+    const [created] = tx.insert(taskTable).values(taskValues).returning().all();
 
     if (!created) {
       throw new Error("Failed to create task");

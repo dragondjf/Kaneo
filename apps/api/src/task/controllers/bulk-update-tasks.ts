@@ -116,9 +116,9 @@ async function bulkUpdateTasks({
         const result = await db
           .update(taskTable)
           .set({ status: value, columnId: column?.id ?? null })
-          .where(inArray(taskTable.id, projectTaskIds));
+          .where(inArray(taskTable.id, projectTaskIds)).run();
 
-        updatedCount += result.rowCount ?? projectTaskIds.length;
+        updatedCount += result.changes ?? projectTaskIds.length;
 
         for (const taskId of projectTaskIds) {
           await publishEvent("task.status_changed", {
@@ -147,9 +147,9 @@ async function bulkUpdateTasks({
       const result = await db
         .update(taskTable)
         .set({ priority: value })
-        .where(inArray(taskTable.id, foundIds));
+        .where(inArray(taskTable.id, foundIds)).run();
 
-      updatedCount = result.rowCount ?? foundIds.length;
+      updatedCount = result.changes ?? foundIds.length;
 
       for (const task of tasks) {
         await publishEvent("task.priority_changed", {
@@ -177,9 +177,9 @@ async function bulkUpdateTasks({
       const result = await db
         .update(taskTable)
         .set({ userId: value || null })
-        .where(inArray(taskTable.id, foundIds));
+        .where(inArray(taskTable.id, foundIds)).run();
 
-      updatedCount = result.rowCount ?? foundIds.length;
+      updatedCount = result.changes ?? foundIds.length;
 
       for (const task of tasks) {
         const eventType = value ? "task.assignee_changed" : "task.unassigned";
@@ -200,9 +200,9 @@ async function bulkUpdateTasks({
     case "delete": {
       const result = await db
         .delete(taskTable)
-        .where(inArray(taskTable.id, foundIds));
+        .where(inArray(taskTable.id, foundIds)).run();
 
-      updatedCount = result.rowCount ?? foundIds.length;
+      updatedCount = result.changes ?? foundIds.length;
 
       for (const task of tasks) {
         await publishEvent("task.deleted", {
@@ -336,9 +336,9 @@ async function bulkUpdateTasks({
       const result = await db
         .update(taskTable)
         .set({ dueDate: parsedDate })
-        .where(inArray(taskTable.id, foundIds));
+        .where(inArray(taskTable.id, foundIds)).run();
 
-      updatedCount = result.rowCount ?? foundIds.length;
+      updatedCount = result.changes ?? foundIds.length;
 
       for (const task of tasks) {
         await publishEvent("task.due_date_changed", {

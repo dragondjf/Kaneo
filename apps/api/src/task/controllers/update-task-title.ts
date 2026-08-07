@@ -28,12 +28,13 @@ async function updateTaskTitle({
   // Audit history is not best-effort. Commit the title and its immutable
   // history row atomically; event subscribers remain notifications/integrations
   // only and cannot make the audit trail disappear.
-  const updatedTask = await db.transaction(async (tx) => {
-    const [task] = await tx
+  const updatedTask = db.transaction((tx) => {
+    const [task] = tx
       .update(taskTable)
       .set({ title })
       .where(eq(taskTable.id, id))
-      .returning();
+      .returning()
+      .all();
 
     if (!task) {
       throw new HTTPException(500, {
@@ -41,13 +42,13 @@ async function updateTaskTitle({
       });
     }
 
-    await tx.insert(activityTable).values({
+    tx.insert(activityTable).values({
       taskId: task.id,
       type: "title_changed",
       userId: currentUserId,
       content: null,
       eventData: { oldTitle: existingTask.title, newTitle: title },
-    });
+    }).run();
 
     return task;
   });

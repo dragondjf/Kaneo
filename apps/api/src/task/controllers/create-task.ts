@@ -58,10 +58,10 @@ async function createTask({
 
   const nextPosition = (maxPositionResult?.maxPosition ?? 0) + 1;
 
-  const createdTask = await db.transaction(async (tx) => {
-    const taskNumber = await claimTaskNumber(projectId, tx);
+  const createdTask = db.transaction((tx) => {
+    const taskNumber = claimTaskNumber(projectId, tx);
 
-    const [task] = await tx
+    const [task] = tx
       .insert(taskTable)
       .values({
         projectId,
@@ -76,7 +76,8 @@ async function createTask({
         number: taskNumber,
         position: nextPosition,
       })
-      .returning();
+      .returning()
+      .all();
 
     return task;
   });

@@ -1,6 +1,8 @@
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import Database from "better-sqlite3";
 import { config } from "dotenv-mono";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
   accountTableRelations,
   activityTableRelations,
@@ -31,7 +33,7 @@ import {
   workspaceTableRelations,
   workspaceUserTableRelations,
 } from "./relations";
-import { resolveDatabaseConnectionString } from "./resolve-database-url";
+import { resolveDatabasePath } from "./resolve-database-url";
 import {
   accountTable,
   activityTable,
@@ -132,27 +134,30 @@ export const schema = {
 
 type DatabaseInstance = ReturnType<typeof drizzle<typeof schema>>;
 
-let pool: Pool | undefined;
+let sqlite: Database.Database | undefined;
 let dbInstance: DatabaseInstance | undefined;
 
-export function getDatabasePool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: resolveDatabaseConnectionString(),
-      // Fail fast when Railway's internal network is slow rather than hanging
-      // indefinitely and blocking every API request.
-      connectionTimeoutMillis: 5_000,
-      idleTimeoutMillis: 30_000,
-      max: 10,
-    });
+export function getSqliteClient(): Database.Database {
+  if (!sqlite) {
+    const dbPath = resolveDatabasePath();
+    const absolutePath = resolve(dbPath);
+
+    mkdirSync(dirname(absolutePath), { recursive: true });
+
+    sqlite = new Database(absolutePath);
+
+    // Keep foreign keys enforced (SQLite disables them by default).
+    sqlite.pragma("foreign_keys = ON");
+    // WAL improves concurrency for the API's multi-read workloads.
+    sqlite.pragma("journal_mode = WAL");
   }
 
-  return pool;
+  return sqlite;
 }
 
 export function getDatabase(): DatabaseInstance {
   if (!dbInstance) {
-    dbInstance = drizzle(getDatabasePool(), {
+    dbInstance = drizzle(getSqliteClient(), {
       schema,
     });
   }

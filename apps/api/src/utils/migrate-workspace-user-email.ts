@@ -1,10 +1,14 @@
 import { sql } from "drizzle-orm";
 import db from "../database";
+import { columnExists, tableExists } from "../database/sqlite-helpers";
 
 /**
  * Migration script to handle conversion from user_email to user_id in workspace_member table.
  * This runs before Drizzle migrations to ensure no NULL user_id values exist and prevents
  * column collision errors during migration.
+ *
+ * SQLite notes: the legacy `workspace_member` table does not exist on fresh
+ * installs (the current schema uses `workspace_user`), so this is a no-op.
  */
 export async function migrateWorkspaceUserEmail() {
   console.log(
@@ -12,18 +16,7 @@ export async function migrateWorkspaceUserEmail() {
   );
 
   try {
-    const tableExists = await db.execute(sql`
-         SELECT EXISTS (
-           SELECT 1
-           FROM information_schema.tables
-           WHERE table_name = 'workspace_member'
-         ) AS exists;
-       `);
-
-    const exists =
-      tableExists.rows[0]?.exists === true ||
-      tableExists.rows[0]?.exists === "t";
-    if (!exists) {
+    if (!(await tableExists(db, "workspace_member"))) {
       console.log(
         "🛈 workspace_member table does not exist; skipping migration.",
       );
@@ -31,34 +24,28 @@ export async function migrateWorkspaceUserEmail() {
     }
 
     // Check if user_email column still exists
-    const hasUserEmailColumn = await db.execute(sql`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'workspace_member'
-      AND column_name = 'user_email'
-    `);
+    const hasUserEmailColumn = await columnExists(
+      db,
+      "workspace_member",
+      "user_email",
+    );
 
     // Check if user_id column already exists
-    const hasUserIdColumn = await db.execute(sql`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'workspace_member'
-      AND column_name = 'user_id'
-    `);
+    const hasUserIdColumn = await columnExists(db, "workspace_member", "user_id");
 
-    if (hasUserEmailColumn.rows.length > 0) {
+    if (hasUserEmailColumn) {
       console.log("📧 Found user_email column, migrating to user_id...");
 
       // Add user_id column if it doesn't exist
-      if (hasUserIdColumn.rows.length === 0) {
-        await db.execute(sql`
+      if (!hasUserIdColumn) {
+        await db.run(sql`
           ALTER TABLE "workspace_member" ADD COLUMN "user_id" text;
         `);
         console.log("➕ Added user_id column");
       }
 
       // Update user_id based on user_email
-      await db.execute(sql`
+      await db.run(sql`
         UPDATE "workspace_member"
         SET "user_id" = (
           SELECT u.id
@@ -69,73 +56,81 @@ export async function migrateWorkspaceUserEmail() {
       `);
 
       // Remove records where user_email doesn't match any existing user
-      const orphanedRecords = await db.execute(sql`
+      const orphanedRecords = await db.all(sql`
         SELECT COUNT(*) as count
         FROM "workspace_member"
         WHERE "user_id" IS NULL AND "user_email" IS NOT NULL;
       `);
 
       if (
-        orphanedRecords.rows[0]?.count &&
-        Number(orphanedRecords.rows[0].count) > 0
+        (orphanedRecords[0] as { count?: number } | undefined)?.count &&
+        Number(
+          (orphanedRecords[0] as { count?: number } | undefined)?.count,
+        ) > 0
       ) {
         console.log(
-          `⚠️  Found ${orphanedRecords.rows[0].count} workspace_member records with invalid user_email. Removing them...`,
+          `⚠️  Found ${(orphanedRecords[0] as { count?: number } | undefined)?.count} workspace_member records with invalid user_email. Removing them...`,
         );
 
-        await db.execute(sql`
+        await db.run(sql`
           DELETE FROM "workspace_member"
           WHERE "user_id" IS NULL AND "user_email" IS NOT NULL;
         `);
       }
 
       // Remove records where both user_email and user_id are NULL
-      const nullRecords = await db.execute(sql`
+      const nullRecords = await db.all(sql`
         SELECT COUNT(*) as count
         FROM "workspace_member"
         WHERE "user_id" IS NULL AND ("user_email" IS NULL OR "user_email" = '');
       `);
 
-      if (nullRecords.rows[0]?.count && Number(nullRecords.rows[0].count) > 0) {
+      if (
+        (nullRecords[0] as { count?: number } | undefined)?.count &&
+        Number((nullRecords[0] as { count?: number } | undefined)?.count) > 0
+      ) {
         console.log(
-          `⚠️  Found ${nullRecords.rows[0].count} workspace_member records with no user identification. Removing them...`,
+          `⚠️  Found ${(nullRecords[0] as { count?: number } | undefined)?.count} workspace_member records with no user identification. Removing them...`,
         );
 
-        await db.execute(sql`
+        await db.run(sql`
           DELETE FROM "workspace_member"
           WHERE "user_id" IS NULL AND ("user_email" IS NULL OR "user_email" = '');
         `);
       }
 
       // Drop the user_email column (completing the migration)
-      await db.execute(sql`
+      await db.run(sql`
         ALTER TABLE "workspace_member" DROP COLUMN "user_email";
       `);
 
       console.log(
         "✅ Successfully migrated user_email to user_id and dropped user_email column",
       );
-    } else if (hasUserIdColumn.rows.length === 0) {
+    } else if (!hasUserIdColumn) {
       // Neither column exists, add user_id column
       console.log("➕ Adding user_id column to workspace_member table...");
-      await db.execute(sql`
+      await db.run(sql`
         ALTER TABLE "workspace_member" ADD COLUMN "user_id" text;
       `);
     }
 
     // Check if there are any remaining NULL user_id values
-    const nullUserIds = await db.execute(sql`
+    const nullUserIds = await db.all(sql`
       SELECT COUNT(*) as count
       FROM "workspace_member"
       WHERE "user_id" IS NULL;
     `);
 
-    if (nullUserIds.rows[0]?.count && Number(nullUserIds.rows[0].count) > 0) {
+    if (
+      (nullUserIds[0] as { count?: number } | undefined)?.count &&
+      Number((nullUserIds[0] as { count?: number } | undefined)?.count) > 0
+    ) {
       console.log(
-        `⚠️  Found ${nullUserIds.rows[0].count} workspace_member records with NULL user_id. Removing them...`,
+        `⚠️  Found ${(nullUserIds[0] as { count?: number } | undefined)?.count} workspace_member records with NULL user_id. Removing them...`,
       );
 
-      await db.execute(sql`
+      await db.run(sql`
         DELETE FROM "workspace_member"
         WHERE "user_id" IS NULL;
       `);

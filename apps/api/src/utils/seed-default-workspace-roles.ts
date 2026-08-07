@@ -1,6 +1,7 @@
 import { DEFAULT_ROLE_NAMES, defaultRolePayloads } from "@kaneo/permissions";
-import { and, inArray, sql } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
 import db, { schema } from "../database";
+import { tableExists } from "../database/sqlite-helpers";
 
 /**
  * Backfill the editable default roles (viewer/member/admin) for every
@@ -18,18 +19,7 @@ import db, { schema } from "../database";
  */
 export async function seedDefaultWorkspaceRoles() {
   try {
-    const tableExists = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_name = 'workspace_role'
-      ) AS exists;
-    `);
-
-    const exists =
-      tableExists.rows[0]?.exists === true ||
-      tableExists.rows[0]?.exists === "t";
-    if (!exists) {
+    if (!(await tableExists(db, "workspace_role"))) {
       console.log(
         "🛈 workspace_role table does not exist; skipping default-role seed.",
       );
